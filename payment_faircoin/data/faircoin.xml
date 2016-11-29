@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<openerp>
+    <data noupdate="1">
+        <record id="payment_acquirer_faircoin" model="payment.acquirer">
+            <field name="name">FairCoin</field>
+            <field name="provider">faircoin</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="view_template_id" ref="faircoin_acquirer_button"/>
+            <field name="environment">prod</field>
+            <field name="pre_msg"><![CDATA[<p>Instructions on the FairCoin transaction after clicking on the payment button.</p>]]></field>
+            <field name="faircoin_seller_address">dummy</field>
+<!--            
+            <field name="faircoin_api_username">dummy</field>
+            <field name="faircoin_api_password">dummy</field>
+-->
+        </record>
+
+        <record id="sequence_payment_transaction_type_faircoin" model="ir.sequence.type">
+            <field name="name">Faircoin Payment Transaction</field>
+            <field name="code">faircoin.payment.transaction</field>
+        </record>
+
+        <record id="sequence_payment_transaction_faircoin" model="ir.sequence">
+            <field name="name">Faircoin Payment Transaction</field>
+            <field name="code">faircoin.payment.transaction</field>
+            <field name="prefix"></field>
+            <field eval="1" name="number_next"/>
+            <field eval="1" name="number_increment"/>
+        </record>
+    </data>
+</openerp>

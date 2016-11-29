@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<openerp>
+<data>
+
+<!-- Layout and common templates -->
+
+<template id="assets_frontend" inherit_id="website.assets_frontend" name="faircoin">
+  <xpath expr="." position="inside">
+      <script type="text/javascript" src="/payment_faircoin/static/src/js/faircoin_validate.js"></script>
+  </xpath>
+</template>
+
+        <template id="faircoin_acquirer_button">
+            <form t-if="acquirer.faircoin_seller_address" t-att-action="tx_url" method="post" target="_self">
+                <input type="hidden" name="seller_address" t-att-value="tx_values['seller_address']"/>
+                <input type="hidden" name="item_number" t-att-value="tx_values['item_number']"/>
+                <input type="hidden" name="amount" t-att-value="tx_values['amount'] or '0.0'"/>
+                <input type="hidden" name="currency_code" t-att-value="tx_values['currency_code']"/>
+                <!-- partner / address data -->
+                <input type="hidden" name="password" t-att-value="tx_values['password'] or ''"/>
+                <!-- after payment parameters -->
+                <input t-if='tx_values.get("custom")' type='hidden' name="custom"
+                    t-att-value='tx_values.get("custom")'/>
+                <!-- URLs -->
+                <input t-if="tx_values.get('return')" type='hidden' name='return'
+                    t-att-value="tx_values.get('return')"/>
+                <input type='hidden' name='notify_url'
+                    t-att-value="tx_values.get('notify_url')"/>
+                <input t-if="tx_values.get('cancel_return')" type="hidden" name="cancel_return"
+                    t-att-value="tx_values.get('cancel_return')"/>
+                <!-- submit -->
+                <button type="submit" width="100px"
+                    t-att-class="submit_class">
+                    <img t-if="not submit_txt" src="/payment_faircoin/static/src/img/faircoin_icon.png"/>
+                    <span t-if="submit_txt"><t t-esc="submit_txt"/> <span class="fa fa-long-arrow-right"/></span>
+                </button>
+            </form>
+        </template>
+       <template id="payment_form">
+         <t t-call="website.layout">
+           <t t-set="additional_title">Payment Details</t>
+           <div id="wrap">
+             <div class="container oe_website_sale">
+               <div class="row">
+                 <ul class="wizard pull-right">
+                   <li class="text-muted">Review Order<span class="chevron"></span></li>
+                   <li class="text-muted">Shipping &amp; Billing<span class="chevron"></span></li>
+                   <li class="text-primary">Payment<span class="chevron"></span></li>
+                   <li class="text-muted">Confirmation<span class="chevron"></span></li>
+                 </ul>
+                   <div class="oe_faircoin_tx_status" t-att-data-order-id="order.id" style="background-color:#f0f0fa">
+                   <h4>Thank you for your order (Ref: <t t-esc="order.name" />) at FairMarket.</h4>
+                   <p>Waiting for payment transaction. This page will be updated when the payment has been confirmed.</p>
+               </div> 
+               <div class="col-md-8 oe_cart">
+                   <center>
+                   <div class="my_payment_form" style="background-color:#f0f0fa" t-if="order.amount_total"> 
+                      <div class="oe_clearfix"/>
+                          <h4>Please, pay with this FairCoin transaction :</h4>
+                          <h3>Send  <strong><t t-esc="order.amount_total" /></strong>  faircoins</h3> 
+                          <h3>to the address :  <strong><t t-esc="order.fcaddress" /></strong></h3>
+                          <span t-field="order.qrcode" t-field-options='{"widget": "image"}' />
+                   </div></center>
+                   <div class="oe_clearfix"/>
+               </div>
+               <div class="my_payment_form" style="background-color:#f0f0fa" t-if="order.amount_total == 0">
+                      <p>Your partner will comunicate with you as soon as posible.</p>
+               </div>
+               <div class="col-md-3 col-md-offset-1 text-muted" id="right_column">
+                  <h4>Your partner:</h4>
+                  <span t-field="order.company_id.logo_web" t-field-options='{"widget": "image"}' />
+                  <div t-field="order.company_id.partner_id" t-field-options='{
+                    "widget": "contact",
+                    "fields": ["address", "name", "phone", "email"]
+                    }'/>
+                <h4>Bill To:</h4>
+                <div t-field="order.partner_invoice_id" t-field-options='{
+                    "widget": "contact",
+                    "fields": ["address", "name", "phone", "email"]
+                    }'/>
+                <t>
+                    <h4 class="mt32">Ship To:</h4>
+                    <t t-if="order.partner_shipping_id and order.partner_shipping_id.id != order.partner_invoice_id.id">
+                      <div t-field="order.partner_shipping_id" t-field-options='{
+                        "widget": "contact",
+                        "fields": ["address", "name", "phone"]
+                        }'/>
+                    </t>
+                    <address t-if="order.partner_shipping_id.id == order.partner_invoice_id.id">Ship to the same address</address>
+                 </t>
+             </div>
+          </div>
+        </div>
+        </div>
+        <div class="oe_structure"/>
+    </t>
+  </template>       
+</data>
+</openerp>
+
+
+
+

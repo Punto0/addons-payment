@@ -35,7 +35,7 @@ class FaircoinController(http.Controller):
     # ToDo: Esto habra que pasarlo a la configuracion de odoo
     merchant_host = 'http://localhost:8059'
     merchant_password = 'kljk540sbcnm903053209n'
-    expires_in = 20 # minutes
+    expires_in = 1440 # minutes
     confirmations = 0	
     
     def _get_return_url(self, **post):

@@ -30,11 +30,11 @@ class AcquirerGetfaircoin(osv.Model):
         """
         if environment == 'prod':
             return {
-                'getfaircoin_form_url': 'http://dev.getfaircoin.net?edd-listener=fairmarket-JDwMNCEp9D5cqmNgy9Ad',
+                'getfaircoin_form_url': 'https://getfaircoin.net?edd-listener=fairmarket-JDwMNCEp9D5cqmNgy9Ad',
             }
         else:
             return {
-                'getfaircoin_form_url': 'http://dev.getfaircoin.net?edd-listener=fairmarket-JDwMNCEp9D5cqmNgy9Ad',
+                'getfaircoin_form_url': 'https://getfaircoin.net?edd-listener=fairmarket-JDwMNCEp9D5cqmNgy9Ad',
             }
 
     def _get_providers(self, cr, uid, context=None):
@@ -107,7 +107,7 @@ class AcquirerGetfaircoin(osv.Model):
             'email': partner_values['email'],
             'amount': tx_values['amount'],
             'currency': tx_values['currency'] and tx_values['currency'].name or '',
-            'lang': (partner_values.get('lang') or 'en_US').replace('_', '-'),
+            'lang':'en', # (partner_values.get('lang') or 'en').replace('_', '-'),
         })
         if getfaircoin_tx_values.get('return_url'):
             getfaircoin_tx_values['add_returndata'] = getfaircoin_tx_values.pop('return_url')
@@ -143,9 +143,9 @@ class TxGetfaircoin(osv.Model):
     def _getfaircoin_form_get_tx_from_data(self, cr, uid, data, context=None):
         """ Given a data dict coming from getfaircoin, verify it and find the related
         transaction record. """
-        origin_data = dict(data)
-        data = normalize_keys_upper(data)
-        reference, pay_id = data.get('order_id'), data.get('payment')
+        #origin_data = dict(data)
+        #data = normalize_keys_upper(data)
+        reference, pay_id = data.get('order_id'), data.get('payment_status')
         if not reference:
             error_msg = 'Getfaircoin: received data with missing reference (%s) ' % (reference)
             _logger.error(error_msg)

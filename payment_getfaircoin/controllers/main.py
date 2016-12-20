@@ -7,15 +7,15 @@ except ImportError:
 import logging
 import pprint
 import werkzeug
+import urlparse
 
 from openerp import http, SUPERUSER_ID
 from openerp.http import request
 
 _logger = logging.getLogger(__name__)
 
-
 class GetfaircoinController(http.Controller):
-    _return_url = '/payment/getfaircoin/return'
+    _return_url = '/payment/getfaircoin/ipn'
     _cancel_url = '/payment/getfaircoin/cancel'
     _exception_url = '/payment/getfaircoin/error'
     _reject_url = '/payment/getfaircoin/reject'
@@ -32,3 +32,21 @@ class GetfaircoinController(http.Controller):
         post = dict((key.upper(), value) for key, value in post.items())
         return_url = post.get('ADD_RETURNDATA') or '/'
         return werkzeug.utils.redirect(return_url)
+
+    @http.route('/payment/getfaircoin/ipn', type='http', auth='none')
+    def getfaircoin_ipn(self, **post):
+        _logger.info('Getfaircoin IPN: entering post data %s', pprint.pformat(post))  # debug
+        #cr, uid, context = request.cr, SUPERUSER_ID, request.context
+        if not post:
+            data_raw = request.httprequest.get_data()	
+            data_decoded = urlparse.parse_qs(data_raw)
+	    _logger.debug('Data decoded : %s', pprint.pformat(data_decoded))
+        #data_post = {
+        #    'payment_status': data_decoded['paid'],
+	#    'order_id' : data_decoded['item_number']	
+        # }	
+	#_logger.info('data posted to : %s' %data_post)
+        
+        #request.registry['payment.transaction'].form_feedback(cr, uid, data_decoded, 'getfaircoin', context)
+
+        return 'OK' # Retorna respuesta al demonio

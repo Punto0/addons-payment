@@ -3,22 +3,26 @@
     <data noupdate="1">
 
         <template id="getfaircoin_acquirer_button">
-            <form t-if="acquirer.brq_websitekey" t-att-action="tx_url" method="post" target="_self">
-<!--                <input type="hidden" name="Brq_websitekey" t-att-value="tx_values['Brq_websitekey']"/> -->
-                <input type="hidden" name="amount" t-att-value="tx_values['amount'] or '0.0'"/>
-                <input type="hidden" name="lang" t-att-value="tx_values['lang']"/>
+            <form t-att-action="tx_url" method="post" target="_self">
                 <input type="hidden" name="first_name" t-att-value="tx_values['first_name']"/>
                 <input type="hidden" name="email" t-att-value="tx_values['email']"/>
-                <input type="hidden" name="fm_order" t-att-value="tx_values['reference']"/>
                 <input type="hidden" name="order_id" t-att-value="tx_values['reference']"/>
+<!--                <input type="hidden" name="fm_order" t-att-value="tx_values['reference']"/> -->
+                <input type="hidden" name="lang" t-att-value="tx_values['lang'] or 'en'"/> 
+                <input type="hidden" name="amount" t-att-value="tx_values['amount'] or '0.0'"/>
+
+<!--                <input type="hidden" name="fm_order" t-att-value="tx_values['reference']"/> -->
 
 <!--                <input type="hidden" name="currency" t-att-value="tx_values['currency']"/> -->
+
 <!--                <input type="hidden" name="Brq_signature" t-att-value="tx_values['Brq_signature']"/> 
+                <input type="hidden" name="Brq_websitekey" t-att-value="tx_values['Brq_websitekey']"/>
                 <input type="hidden" name="brq_test" t-att-value="tx_values['brq_test']"/>
 -->
                  <!-- URLs -->
-                <input t-if="tx_values.get('return')" type='hidden' name='return'
+<!--                <input t-if="tx_values.get('return')" type='hidden' name='return'
                     t-att-value="tx_values.get('return')"/>
+-->
 <!--                <input t-if="tx_values.get('returncancel')" type='hidden' name='returncancel'
                     t-att-value="tx_values.get('returncancel')"/>
                 <input t-if="tx_values.get('returnerror')" type='hidden' name='returnerror'

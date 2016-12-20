@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<openerp>
+    <data noupdate="0">
+
+        <record id="payment_acquirer_getfaircoin" model="payment.acquirer">
+            <field name="name">Getfaircoin.net</field>
+            <field name="provider">getfaircoin</field>
+            <field name="company_id" ref="base.main_company"/>
+            <field name="view_template_id" ref="getfaircoin_acquirer_button"/>
+            <field name="environment">test</field>
+            <field name="pre_msg"><![CDATA[<p>You will be redirected to the Getfaircoin website after clicking on the payment button.</p>]]></field>
+            <field name="brq_websitekey">dummy</field>
+            <field name="brq_secretkey">dummy</field>
+        </record>
+
+    </data>
+</openerp>

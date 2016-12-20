@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<openerp>
+    <data noupdate="1">
+
+        <template id="getfaircoin_acquirer_button">
+            <form t-att-action="tx_url" method="post" target="_self">
+                <input type="hidden" name="first_name" t-att-value="tx_values['first_name']"/>
+                <input type="hidden" name="email" t-att-value="tx_values['email']"/>
+                <input type="hidden" name="order_id" t-att-value="tx_values['reference']"/>
+<!--                <input type="hidden" name="fm_order" t-att-value="tx_values['reference']"/> -->
+                <input type="hidden" name="lang" t-att-value="tx_values['lang'] or 'en'"/> 
+                <input type="hidden" name="amount" t-att-value="tx_values['amount'] or '0.0'"/>
+
+<!--                <input type="hidden" name="fm_order" t-att-value="tx_values['reference']"/> -->
+
+<!--                <input type="hidden" name="currency" t-att-value="tx_values['currency']"/> -->
+
+<!--                <input type="hidden" name="Brq_signature" t-att-value="tx_values['Brq_signature']"/> 
+                <input type="hidden" name="Brq_websitekey" t-att-value="tx_values['Brq_websitekey']"/>
+                <input type="hidden" name="brq_test" t-att-value="tx_values['brq_test']"/>
+-->
+                 <!-- URLs -->
+<!--                <input t-if="tx_values.get('return')" type='hidden' name='return'
+                    t-att-value="tx_values.get('return')"/>
+-->
+<!--                <input t-if="tx_values.get('returncancel')" type='hidden' name='returncancel'
+                    t-att-value="tx_values.get('returncancel')"/>
+                <input t-if="tx_values.get('returnerror')" type='hidden' name='returnerror'
+                    t-att-value="tx_values.get('returnerror')"/>
+                <input t-if="tx_values.get('returnreject')" type='hidden' name='returnreject'
+                    t-att-value="tx_values.get('returnreject')"/>
+                <input type='hidden' name='add_returndata' t-att-value="tx_values.get('add_returndata')"/>
+-->
+                <!-- submit -->
+                <button type="submit" width="100px"
+                    t-att-class="submit_class">
+                    <img t-if="not submit_txt" src="/payment_getfaircoin/static/src/img/getfaircoin_icon.png"/>
+                    <span t-if="submit_txt"><t t-esc="submit_txt"/> <span class="fa fa-long-arrow-right"/></span>
+                </button>
+            </form>
+        </template>
+
+    </data>
+</openerp>

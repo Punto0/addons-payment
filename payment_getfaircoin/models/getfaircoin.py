@@ -143,9 +143,9 @@ class TxGetfaircoin(osv.Model):
     def _getfaircoin_form_get_tx_from_data(self, cr, uid, data, context=None):
         """ Given a data dict coming from getfaircoin, verify it and find the related
         transaction record. """
-        #origin_data = dict(data)
         data = normalize_keys_upper(data)
-        reference, pay_id = data.get('ORDER_ID'), data.get('PAYMENT_STATUS')
+        logging.info("BEGIN getfaircoin_form_get_tx_data : %s" %data)
+        reference, pay_id = data.get('ITEM_NUMBER'), data.get('PAYMENT_STATUS')
         if not reference:
             error_msg = 'Getfaircoin: received data with missing reference (%s) ' % (reference)
             _logger.error(error_msg)
@@ -177,38 +177,40 @@ class TxGetfaircoin(osv.Model):
         #if tx.acquirer_reference and data.get('BRQ_TRANSACTIONS') != tx.acquirer_reference:
         #    invalid_parameters.append(('Transaction Id', data.get('BRQ_TRANSACTIONS'), tx.acquirer_reference))
         # check what is buyed
-        if float_compare(float(data.get('AMOUNT', '0.0')), tx.amount, 2) != 0:
-            invalid_parameters.append(('Amount', data.get('AMOUNT'), '%.2f' % tx.amount))
+        #if float_compare(float(data.get('AMOUNT', '0.0')), tx.amount, 2) != 0:
+        #    invalid_parameters.append(('Amount', data.get('AMOUNT'), '%.2f' % tx.amount))
         #if data.get('BRQ_CURRENCY') != tx.currency_id.name:
         #    invalid_parameters.append(('Currency', data.get('BRQ_CURRENCY'), tx.currency_id.name))
 
         return invalid_parameters
 
     def _getfaircoin_form_validate(self, cr, uid, tx, data, context=None):
-        _logger.info("getfaircoin_form_validate : %s " %data)
         data = normalize_keys_upper(data)
-        data_mod = {'order_id' : data.get('ITEM_NUMBER') }
-        status_code = int(data.get('payment_status'))
+        _logger.info("getfaircoin_form_validate : %s " %data)
+        tx = self._getfaircoin_form_get_tx_from_data(cr, uid, data, context=context)
+        status_code = data.get('PAID')
         if not status_code:
-            status_code = 'PENDING'
-        tx = self._getfaircoin_form_get_tx_from_data(cr, uid, data_mod, context=context)
+            status_code = 'pending'
         _logger.debug("status_code : %s" %status_code)
-        if 'DONE' in status_code:
+        if 'done' in status_code:
             tx.write({
                 'state': 'done',
                 'getfaircoin_txnid': data.get('GETFAIR_ID'),
+                'date_validate' : fields.datetime.now(),
             })
             return True
-        elif 'CANCEL' in status_code:
+        elif 'pending' in status_code:
             tx.write({
                 'state': 'pending',
                 'getfaircoin_txnid': data.get('GETFAIR_ID'),
+                'date_validate' : fields.datetime.now(),
             })
             return True
-        elif 'PENDING' in status_code:
+        elif 'cancel' in status_code:
             tx.write({
                 'state': 'cancel',
                 'getfaircoin_txnid': data.get('GETFAIR_ID'),
+                'date_validate' : fields.datetime.now(),
             })
             return True
         else:
@@ -218,5 +220,6 @@ class TxGetfaircoin(osv.Model):
                 'state': 'error',
                 'state_message': error,
                 'getfaircoin_txnid': data.get('GETFAIR_ID'),
+                'date_validate' : fields.datetime.now(),
             })
             return False

@@ -31,22 +31,23 @@ class GetfaircoinController(http.Controller):
         request.registry['payment.transaction'].form_feedback(request.cr, SUPERUSER_ID, post, 'getfaircoin', context=request.context)
         post = dict((key.upper(), value) for key, value in post.items())
         #return_url = post.get('ADD_RETURNDATA') or '/'
-        return werkzeug.utils.redirect('/shop/payment/confirmation')
+        return werkzeug.utils.redirect('/shop/payment/validate')
 
     @http.route('/payment/getfaircoin/ipn', type='http', auth='none')
     def getfaircoin_ipn(self, **post):
         _logger.info('Getfaircoin IPN: entering post data %s', pprint.pformat(post))  # debug
         #cr, uid, context = request.cr, SUPERUSER_ID, request.context
-        if not post:
-            data_raw = request.httprequest.get_data()	
-            data_decoded = urlparse.parse_qs(data_raw)
-	    _logger.debug('Data decoded : %s', pprint.pformat(data_decoded))
+        #if not post:
+        #    data_raw = request.httprequest.get_data()	
+        #    data_decoded = urlparse.parse_qs(data_raw)
+	#    _logger.debug('Data decoded : %s', pprint.pformat(data_decoded))
         #data_post = {
         #    'payment_status': data_decoded['paid'],
 	#    'order_id' : data_decoded['item_number']	
-        # }	
+        #    'gettfair_id' : data_decoded['gettfair_id']
+        #}	
 	#_logger.info('data posted to : %s' %data_post)
         
-        #request.registry['payment.transaction'].form_feedback(cr, uid, data_decoded, 'getfaircoin', context)
+        request.registry['payment.transaction'].form_feedback(request.cr, SUPERUSER_ID, post, 'getfaircoin', request.context)
 
         return 'OK' # Retorna respuesta al demonio

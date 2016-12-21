@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
 {
-    'name': 'Getfaircoin Payment Acquirer',
+    'name': 'GetFaircoin Payment Acquirer',
     'category': 'Hidden',
-    'summary': 'Payment Acquirer: getfaircoin.net Implementation',
+    'summary': 'Payment Acquirer: GetFaircoin.net Implementation',
     'version': '1.0',
     'description': """Getfaircoin.net Payment Acquirer""",
     'author': 'punto0.org - fair.coop',

@@ -28,10 +28,10 @@ class GetfaircoinController(http.Controller):
     ], type='http', auth='none')
     def getfaircoin_return(self, **post):
         _logger.info('Getfaircoin: entering form_feedback with post data %s', pprint.pformat(post))  # debug
-        #request.registry['payment.transaction'].form_feedback(request.cr, SUPERUSER_ID, post, 'getfaircoin', context=request.context)
+        request.registry['payment.transaction'].form_feedback(request.cr, SUPERUSER_ID, post, 'getfaircoin', context=request.context)
         post = dict((key.upper(), value) for key, value in post.items())
         #return_url = post.get('ADD_RETURNDATA') or '/'
-        return werkzeug.utils.redirect('/shop/payment/validate')
+        return werkzeug.utils.redirect('/shop/payment/confirmation')
 
     @http.route('/payment/getfaircoin/ipn', type='http', auth='none')
     def getfaircoin_ipn(self, **post):

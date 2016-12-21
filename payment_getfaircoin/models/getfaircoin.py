@@ -144,8 +144,8 @@ class TxGetfaircoin(osv.Model):
         """ Given a data dict coming from getfaircoin, verify it and find the related
         transaction record. """
         #origin_data = dict(data)
-        #data = normalize_keys_upper(data)
-        reference, pay_id = data.get('order_id'), data.get('payment_status')
+        data = normalize_keys_upper(data)
+        reference, pay_id = data.get('ORDER_ID'), data.get('PAYMENT_STATUS')
         if not reference:
             error_msg = 'Getfaircoin: received data with missing reference (%s) ' % (reference)
             _logger.error(error_msg)
@@ -185,13 +185,14 @@ class TxGetfaircoin(osv.Model):
         return invalid_parameters
 
     def _getfaircoin_form_validate(self, cr, uid, tx, data, context=None):
-        _logger.debug("getfaircoin_form_validate : %s " %data)
+        _logger.info("getfaircoin_form_validate : %s " %data)
         data = normalize_keys_upper(data)
         data_mod = {'order_id' : data.get('ITEM_NUMBER') }
         status_code = int(data.get('payment_status'))
         if not status_code:
             status_code = 'PENDING'
         tx = self._getfaircoin_form_get_tx_from_data(cr, uid, data_mod, context=context)
+        _logger.debug("status_code : %s" %status_code)
         if 'DONE' in status_code:
             tx.write({
                 'state': 'done',

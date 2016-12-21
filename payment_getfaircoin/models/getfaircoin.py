@@ -187,23 +187,27 @@ class TxGetfaircoin(osv.Model):
     def _getfaircoin_form_validate(self, cr, uid, tx, data, context=None):
         _logger.debug("getfaircoin_form_validate : %s " %data)
         data = normalize_keys_upper(data)
-        status_code = int(data.get('STATUSCODE','0'))
-        if status_code in self._getfaircoin_valid_tx_status:
+        data_mod = {'order_id' : data.get('ITEM_NUMBER') }
+        status_code = int(data.get('payment_status'))
+        if not status_code:
+            status_code = 'PENDING'
+        tx = self._getfaircoin_form_get_tx_from_data(cr, uid, data_mod, context=context)
+        if 'DONE' in status_code:
             tx.write({
                 'state': 'done',
-                'getfaircoin_txnid': data.get('TRANSACTIONS'),
+                'getfaircoin_txnid': data.get('GETFAIR_ID'),
             })
             return True
-        elif status_code in self._getfaircoin_pending_tx_status:
+        elif 'CANCEL' in status_code:
             tx.write({
                 'state': 'pending',
-                'getfaircoin_txnid': data.get('TRANSACTIONS'),
+                'getfaircoin_txnid': data.get('GETFAIR_ID'),
             })
             return True
-        elif status_code in self._getfaircoin_cancel_tx_status:
+        elif 'PENDING' in status_code:
             tx.write({
                 'state': 'cancel',
-                'getfaircoin_txnid': data.get('TRANSACTIONS'),
+                'getfaircoin_txnid': data.get('GETFAIR_ID'),
             })
             return True
         else:
@@ -212,6 +216,6 @@ class TxGetfaircoin(osv.Model):
             tx.write({
                 'state': 'error',
                 'state_message': error,
-                'getfaircoin_txnid': data.get('BRQ_TRANSACTIONS'),
+                'getfaircoin_txnid': data.get('GETFAIR_ID'),
             })
             return False

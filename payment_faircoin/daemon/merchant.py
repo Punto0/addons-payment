@@ -170,6 +170,9 @@ def process_request(amount, confirmations, expires_in, password, item_number, se
     if num > 100:
         num = 0
     wallet.add_address(addr)
+    if not os.system("electrum-fair validateaddress %s" %seller_address):
+        seller_address = ''
+
     out_queue.put( ('request', (addr, amount, confirmations, expires_in, item_number, seller_address) ))
     message = "Order %s at Fairmarket" %item_number
     uri = util.create_URI(addr, 1.e6 * float(amount), message)
@@ -312,7 +315,7 @@ def db_thread():
 	    market_total = 1.e6 * float(amount) * (float(market_fee))
             seller_total = int(seller_total)
             market_total = int(market_total)
-            if not seller_address:
+            if (not seller_address) or (seller_address is False):
                 logging.error("I have not the return merchant address, perhaps in Odoo is not set up for this company, please resolve this transaction manually. Reference : %s -- Merchant Amount : %s -- Market address %s Amount : %s" %(reference, seller_total, market_address, market_total))
                 cur.execute("UPDATE electrum_payments SET transferred=1 WHERE oid=%d;"%(oid)) 
                 continue

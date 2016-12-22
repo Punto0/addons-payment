@@ -8,7 +8,7 @@
             <field name="company_id" ref="base.main_company"/>
             <field name="view_template_id" ref="getfaircoin_acquirer_button"/>
             <field name="environment">test</field>
-            <field name="pre_msg"><![CDATA[<p>Pay in euros.<br>You will be redirected to GetFaircoin.net website after clicking on the payment button.</p>]]></field>
+            <field name="pre_msg"><![CDATA[<p>Pay in euros with bank transfer (SEPA).<br>You will be redirected to GetFaircoin.net website after clicking on the payment button.</p>]]></field>
             <field name="brq_websitekey">dummy</field>
             <field name="brq_secretkey">dummy</field>
         </record>

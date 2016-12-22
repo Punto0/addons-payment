@@ -108,7 +108,7 @@ class FaircoinController(http.Controller):
         return 'OK' # Retorna respuesta al demonio
 
     # Sin uso, creo, seria la url donde retorna paypal...
-    @http.route('/payment/faircoin/dpn', type='http', auth="none", methods=['POST'])
+    @http.route('/payment/faircoin/dpn', type='http', auth="none")
     def faircoin_dpn(self, **post):
         _logger.debug('Beginning DPN form_feedback with post data %s', pprint.pformat(post))  # debug
         return_url = self._get_return_url(**post)
@@ -192,14 +192,13 @@ class FaircoinController(http.Controller):
             output_s = output.read()
             b64 = base64.b64encode(output_s).decode()
             order_obj.write({'qrcode': b64, 'fcaddress' : address }, context = context)
-            #order_obj.write({'fcaddress' : address}, context = context)
             # Setea como pending la transaccion
-            #request.registry['payment.transaction'].form_feedback(cr, uid, post, 'faircoin', context) # Da error
-            order_obj.payment_tx_id.state = 'pending'
+            data_post = {
+              'payment_status': 'Pending',
+              'item_number' : reference
+            }
+            request.registry['payment.transaction'].form_feedback(cr, uid, data_post, 'faircoin', context) # Da error
 
-        #return werkzeug.utils.redirect(self._get_return_url(**post))
-        # Retorna una template renderizada con el header y el footer
-        #_logger.debug('tx state : %s' %tx.state)
         return request.website.render('payment_faircoin.payment_form', {
                 'amount' : amount,
                 'address' : address,

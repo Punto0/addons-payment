@@ -145,7 +145,7 @@ class TxFaircoin(osv.Model):
     # FORM RELATED METHODS
     # --------------------------------------------------
 
-    def faircoin_form_get_tx_from_data(self, cr, uid, data, context=None):
+    def _faircoin_form_get_tx_from_data(self, cr, uid, data, context=None):
         _logger.debug('Begin faircoin_form_get_tx_from_data. Data received %s' %data)
 	reference = data.get('item_number')
         #paid = data.get("paid")
@@ -209,64 +209,49 @@ class TxFaircoin(osv.Model):
     def _faircoin_form_validate(self, cr, uid, tx, data, context=None):
         _logger.debug('Begin faircoin_form_validate')
         _logger.debug('Data : %s' %data)
-        _logger.debug('tx : %s' %tx)
-        _logger.debug('context %s' %context)
         
         status = data.get('payment_status')
 	reference = data.get('item_number')
-
-        tx_ids = self.pool['payment.transaction'].search(cr, uid, [('reference', '=', reference)], context=context)
-        if not tx_ids or len(tx_ids) > 1:
-            error_msg = 'Faircoin: received data for reference %s' % (reference)
-            if not tx_ids:
-                error_msg += '; no order found'
-            else:
-                error_msg += '; multiple order found'
-            _logger.error(error_msg)
-            raise ValidationError(error_msg)
-
-        txr = self.pool.get('payment.transaction').browse(cr, uid, tx_ids[0], context=context)
-        order_id = self.pool.get('sale.order').search(cr, uid, [('name','in',reference)], context=context)
-        order = self.pool.get('sale.order').browse(cr, uid, order_id, context=context)
+        tx = self._faircoin_form_get_tx_from_data(cr, uid, data, context=context)
+        #order_id = self.pool.get('sale.order').search(cr, uid, [('name','in',reference)], context=context)
+        #order = self.pool.get('sale.order').browse(cr, uid, order_id, context=context)
         #txr = order.payment_tx_id
-        if status in ['Completed', 'Processed']:
+        if status in ['Completed']:
             _logger.info('tx set done for reference %s' %(reference))
-            data.update(acquirer_reference=order.name,state='done',date_validate=data.get('payment_date', fields.datetime.now()),amount=order.amount_total)
-            #if txr.sale_order_id and txr.sale_order_id.state in ['draft', 'sent','pending']:
-            self.pool['sale.order'].action_button_confirm(cr, SUPERUSER_ID, [order.id], context=context)
+            tx.write({
+                'state': 'done',
+                'faircoin_txn_id': reference,
+                'date_validate' : fields.datetime.now(),
+            })
+            #self.pool['sale.order'].action_button_confirm(cr, SUPERUSER_ID, [order.id], context=context)
             #self.pool['sale.order'].force_quotation_send(cr, SUPERUSER_ID, [order.id], context=context)
-            _logger.debug('writing data : %s' %data)
-            return txr.write(data)
-        elif status in ['Pending', 'Expired']:
+            return True
+        elif status in ['Pending']:
             _logger.info('tx state from pending, expired to cancel %s' %(reference))
-            data.update(state='cancel', state_message=data.get('cancelling_reason', ''))
-            #if tx.sale_order_id:
-            #    self.pool['sale.order'].action_cancel(cr, SUPERUSER_ID, [txr.sale_order_id.id], context=context)
-                # ToDo: Send a email notiying the cancel status in the order
-            return txr.write(data)
-	elif status in ['']:
-            _logger.info('tx state from null to pending %s' %(reference))
-            data.update(state='pending')
-            #if txr.sale_order_id:
-            #self.pool['sale.order'].force_quotation_send(cr, uid, [txr.sale_order_id.id], context=context)
-            return txr.write(data)
-	elif status in ['Draft']:
+            tx.write({
+                'state': 'pending',
+                'faircoin_txn_id': reference,
+                'date_validate' : fields.datetime.now(),
+            })
+            return True
+        elif status in ['Expired']:
             _logger.info('tx state from draft to pending %s' % (reference))
-            data.update(state='pending')
-            #if txr.sale_order_id:
-            #    self.pool['sale.order'].force_quotation_send(cr, uid, [txr.sale_order_id.id], context=context)
-            return txr.write(data)
-	elif status in [None]:
-            _logger.info('from null to pending' % (reference))
-            data.update(state='pending')
-            #if txr.sale_order_id:
-            #  self.pool['sale.order'].force_quotation_send(cr, uid, [txr.sale_order_id.id], context=context)
-            return txr.write(data)
+            tx.write({
+                'state': 'draft',
+                'faircoin_txn_id': reference,
+                'date_validate' : fields.datetime.now(),
+            })
+            return True
+
         else:
             error = 'Received unrecognized status for Faircoin payment %s: %s, set as error' % (reference, status)
             _logger.error(error)
-            data.update(state='error', state_message=error)
-            return txr.write(data)
+            tx.write({
+                'state': 'error',
+                'faircoin_txn_id': reference,
+                'date_validate' : fields.datetime.now(),
+            })
+            return False 
 
     # --------------------------------------------------
     # SERVER2SERVER RELATED METHODS

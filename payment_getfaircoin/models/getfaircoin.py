@@ -34,7 +34,7 @@ class AcquirerGetfaircoin(osv.Model):
             }
         else:
             return {
-                'getfaircoin_form_url': 'https://getfaircoin.net?edd-listener=fairmarket-JDwMNCEp9D5cqmNgy9Ad',
+                'getfaircoin_form_url': 'https://dev.getfaircoin.net?edd-listener=fairmarket-JDwMNCEp9D5cqmNgy9Ad',
             }
 
     def _get_providers(self, cr, uid, context=None):

@@ -30,7 +30,7 @@ import urllib
 import logging
 
 import electrum_fair
-from electrum_fair import util
+from electrum_fair import util, bitcoin
 from electrum_fair.util import NotEnoughFunds, InvalidPassword
 electrum_fair.set_verbosity(True)
 
@@ -85,7 +85,7 @@ def check_create_table(conn):
         for item in data:
             oid, address, amount, paid, item_number, confirmations = item
             with wallet.lock:
-                logging.info("New payment request in file -- Reference : %s -- In address : %s -- Request : %f" %(item_number,address,float(amount)))
+                logging.info("New payment request in file :\nReference : %s\nPayment address : %s\nAmount : %f" %(item_number,address,float(amount)))
                 pending_requests[address] = {'requested':float(amount), 'confirmations':int(confirmations)}
                 wallet.synchronizer.subscribe_to_addresses([address])
                 wallet.up_to_date = False
@@ -148,7 +148,7 @@ def do_stop(password):
     return "ok"
 
 def process_request(amount, confirmations, expires_in, password, item_number, seller_address):
-    logging.debug("New request received. Amount : %s -- Confirmations : %s -- Expires in : %s -- Reference : %s -- Return address : %s" %(amount, confirmations, expires_in, item_number, seller_address))
+    logging.debug("New request received.\nAmount : %s\nConfirmations : %s\nExpires in : %s\nReference : %s\nReturn address : %s" %(amount, confirmations, expires_in, item_number, seller_address))
     global num
     if password != my_password:
         logging.error("wrong password")
@@ -170,13 +170,14 @@ def process_request(amount, confirmations, expires_in, password, item_number, se
     if num > 100:
         num = 0
     wallet.add_address(addr)
-    if not os.system("electrum-fair validateaddress %s" %seller_address):
+    if not bitcoin.is_address(seller_address):
+        logging.warning("Address not valid %s" %seller_address)
         seller_address = ''
 
     out_queue.put( ('request', (addr, amount, confirmations, expires_in, item_number, seller_address) ))
     message = "Order %s at Fairmarket" %item_number
     uri = util.create_URI(addr, 1.e6 * float(amount), message)
-    logging.debug("Address generated: %s -- URI : %s " %(addr, uri) )
+    logging.debug("Returning to Odoo.\nAddress generated: %s\nURI : %s " %(addr, uri) )
     return addr, uri
 
 
@@ -242,7 +243,7 @@ def db_thread():
                 continue
             else:
                 with wallet.lock:
-                    logging.info("New payment request -- Reference : %s -- In address : %s -- Request : %f" %(item_number,addr,float(amount)))
+                    logging.info("New payment request. Reference : %s\nPayment address : %s\nAmount : %f" %(item_number,addr,float(amount)))
                     pending_requests[addr] = {'requested':float(amount), 'confirmations':int(confirmations)}
                     wallet.synchronizer.subscribe_to_addresses([addr])
                     wallet.up_to_date = False
@@ -315,11 +316,11 @@ def db_thread():
 	    market_total = 1.e6 * float(amount) * (float(market_fee))
             seller_total = int(seller_total)
             market_total = int(market_total)
+            logging.info("Init transfer\nReference: %s\nMerchant Address : %s\nAmount : %s\n" %(reference, seller_address, seller_total))
             if (not seller_address) or (seller_address is False):
-                logging.error("I have not the return merchant address, perhaps in Odoo is not set up for this company, please resolve this transaction manually. Reference : %s -- Merchant Amount : %s -- Market address %s Amount : %s" %(reference, seller_total, market_address, market_total))
+                logging.error("I have not a valid adress to retransmite, perhaps in Odoo is not set up for this company or is invalid, please resolve this transaction manually.")
                 cur.execute("UPDATE electrum_payments SET transferred=1 WHERE oid=%d;"%(oid)) 
                 continue
-            logging.info("Init transfer -- Merchant Address : %s Amount : %s -- Market address %s Amount : %s" %(seller_address, seller_total, market_address, market_total))
             if market_total and seller_total > 0:
                 output = [('address', seller_address, int(seller_total)),('address', market_address, int(market_total))]
             elif seller_total > 0:
@@ -363,6 +364,7 @@ if __name__ == '__main__':
     out_queue = Queue.Queue()
     # start network
     c = electrum_fair.SimpleConfig({'wallet_path':wallet_path})
+    c.set_key("rpcport", 7777)
     daemon_socket = electrum_fair.daemon.get_daemon(c, True)
     network = electrum_fair.NetworkProxy(daemon_socket, config)
     network.start()

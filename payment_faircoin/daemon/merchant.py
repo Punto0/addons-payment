@@ -253,6 +253,9 @@ def db_thread():
         except Queue.Empty:
             cmd = ''
 
+        # set paid=0 for expired requests 
+        cur.execute("""UPDATE electrum_payments set paid=0 WHERE expires_at < CURRENT_TIMESTAMP;""")
+
         if cmd == 'payment':
             addr = params
             if addr in pending_requests:
@@ -269,8 +272,6 @@ def db_thread():
 
 
             cur.execute(sql)
-        # set paid=0 for expired requests 
-        cur.execute("""UPDATE electrum_payments set paid=0 WHERE expires_at < CURRENT_TIMESTAMP and paid is NULL;""")
 
         # do callback for addresses that received payment or expired
         cur.execute("""SELECT oid, address, amount, paid, item_number from electrum_payments WHERE paid is not NULL and processed is NULL;""")

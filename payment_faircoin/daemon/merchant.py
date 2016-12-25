@@ -72,15 +72,15 @@ def check_create_table(conn):
     c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='electrum_payments';")
     data = c.fetchall()
     if not data: 
-        c.execute("""CREATE TABLE electrum_payments (address VARCHAR(40), amount FLOAT, confirmations INT(8), received_at TIMESTAMP, expires_at TIMESTAMP, paid INT(1), processed INT(1),item_number VARCHAR(24),seller_address VARCHAR(34),transferred INT(1));""")
+        c.execute("""CREATE TABLE electrum_payments (address VARCHAR(40), amount FLOAT, confirmations INT(8), received_at TIMESTAMP, expires_at TIMESTAMP, item_number VARCHAR(24), seller_address VARCHAR(34), paid INT(1), processed INT(1), transferred INT(1));""")
         conn.commit()
         logging.debug("New database created")
     else:
         c.execute("SELECT Count(address) FROM 'electrum_payments'")
         num = c.fetchone()[0]
-        logging.debug("num rows read : %s" %num)
+        logging.debug("Rows read : %s" %num)
         # Anadimos las direcciones pendientes
-        c.execute("""SELECT oid, address, amount, paid, item_number, confirmations from electrum_payments WHERE paid is NULL and processed is NULL;""")
+        c.execute("""SELECT oid, address, amount, paid, item_number, confirmations from electrum_payments WHERE paid is NULL;""")
         data = c.fetchall()
         for item in data:
             oid, address, amount, paid, item_number, confirmations = item
@@ -98,14 +98,12 @@ def row_to_dict(x):
         'confirmations':x[3],
         'received_at':x[4],
         'expires_at':x[5],
-        'paid':x[6],
-        'processed':x[7],
-	'item_number':x[8],
-	'seller_address':x[9],
+	'item_number':x[6],
+	'seller_address':x[7],
+        'paid':x[8],
+        'processed':x[9],
 	'transferred':x[10]
     }
-
-
 
 # this process detects when addresses have received payments
 def on_wallet_update():
@@ -136,9 +134,6 @@ def on_wallet_update():
             logging.debug("Payment Detected in address: %s. Adding to queue.", addr)
             out_queue.put( ('payment', addr))
 
-
-
-
 def do_stop(password):
     global stopping
     if password != my_password:
@@ -167,7 +162,7 @@ def process_request(amount, confirmations, expires_in, password, item_number, se
         if wallet.is_empty(addr) and not addr in pending_requests:
             done = True
     #addr = wallet.get_unused_address(account) # Esto lanza una excepcion en electrum lib
-    if num > 100:
+    if num > 500:
         num = 0
     wallet.add_address(addr)
     if not bitcoin.is_address(seller_address):
@@ -177,7 +172,7 @@ def process_request(amount, confirmations, expires_in, password, item_number, se
     out_queue.put( ('request', (addr, amount, confirmations, expires_in, item_number, seller_address) ))
     message = "Order %s at Fairmarket" %item_number
     uri = util.create_URI(addr, 1.e6 * float(amount), message)
-    logging.debug("Returning to Odoo.\nAddress generated: %s\nURI : %s " %(addr, uri) )
+    logging.debug("Returning to Odoo:\nAddress generated: %s\nURI : %s " %(addr, uri) )
     return addr, uri
 
 
@@ -218,15 +213,9 @@ def send_command(cmd, params):
     except socket.error:
         logging.error("Can not send the command")
         return 1
-
-    #logging.debug("sending : %s" %json.dumps(out, indent=4))
     return 0
 
-
-
 def db_thread():
-
-
     conn = sqlite3.connect(database);
     # create table if needed
     check_create_table(conn)
@@ -235,7 +224,7 @@ def db_thread():
         # read pending requests from table
         cur.execute("SELECT address, amount, confirmations, item_number FROM electrum_payments WHERE paid IS NULL;")
         data = cur.fetchall()
-
+        
         # add pending requests to the wallet
         for item in data: 
             addr, amount, confirmations, item_number = item
@@ -243,7 +232,7 @@ def db_thread():
                 continue
             else:
                 with wallet.lock:
-                    logging.info("New payment request. Reference : %s\nPayment address : %s\nAmount : %f" %(item_number,addr,float(amount)))
+                    logging.info("New payment request added:\nReference : %s\nPayment address : %s\nAmount : %f" %(item_number,addr,float(amount)))
                     pending_requests[addr] = {'requested':float(amount), 'confirmations':int(confirmations)}
                     wallet.synchronizer.subscribe_to_addresses([addr])
                     wallet.up_to_date = False
@@ -252,9 +241,6 @@ def db_thread():
             cmd, params = out_queue.get(True, 10)
         except Queue.Empty:
             cmd = ''
-
-        # set paid=0 for expired requests 
-        cur.execute("""UPDATE electrum_payments set paid=0 WHERE expires_at < CURRENT_TIMESTAMP;""")
 
         if cmd == 'payment':
             addr = params
@@ -267,11 +253,12 @@ def db_thread():
         elif cmd == 'request':
             # add a new request to the table.
             addr, amount, confs, minutes, item_number, seller_address = params
-            sql = "INSERT INTO electrum_payments (address, amount, confirmations, received_at, expires_at, paid, processed, item_number, seller_address, transferred)"\
-                + " VALUES ('%s', %.8f, %d, datetime('now'), datetime('now', '+%d Minutes'), NULL, NULL, '%s', '%s','0');"%(addr, amount, confs, minutes, item_number, seller_address)
-
-
+            sql = "INSERT INTO electrum_payments (address, amount, confirmations, received_at, expires_at, item_number, seller_address, paid, processed, transferred)"\
+                + " VALUES ('%s', %.8f, %d, datetime('now'), datetime('now', '+%d Minutes'), '%s', '%s',NULL, NULL, NULL);"%(addr, amount, confs, minutes, item_number, seller_address)
             cur.execute(sql)
+
+        # set paid=0 for expired requests 
+        cur.execute("""UPDATE electrum_payments set paid=0 WHERE expires_at < CURRENT_TIMESTAMP AND paid is NULL;""")
 
         # do callback for addresses that received payment or expired
         cur.execute("""SELECT oid, address, amount, paid, item_number from electrum_payments WHERE paid is not NULL and processed is NULL;""")
@@ -289,7 +276,7 @@ def db_thread():
             req = urllib2.Request(url, data_encoded, headers)
             try:
                 response_stream = urllib2.urlopen(req)
-                logging.info('Got Response %s for reference %s in url %s' %(response_stream.read(), item_number, url))         
+                logging.info('Got Response : %s\nfor reference : %s\nin url : %s' %(response_stream.read(), item_number, url))         
             except urllib2.HTTPError as e:
                 logging.error("ERROR: cannot do callback in %s with data %s" %(url, data_json))
                 logging.error("ERROR: code : %s" %e.code)
@@ -308,20 +295,19 @@ def db_thread():
             if address in pending_requests: 
                 del pending_requests[address]
         # Make the transfers
-        cur.execute("""SELECT oid, address, amount, item_number, seller_address from electrum_payments WHERE paid='1' and processed='1' and transferred='0';""")
+        cur.execute("""SELECT oid, address, amount, item_number, seller_address from electrum_payments WHERE paid='1' and processed='1' and transferred is NULL;""")
         data = cur.fetchall()
         for item in data:
             oid, address, amount, reference, seller_address = item
-
+            if (not seller_address) or (seller_address is False):
+                logging.error("I have not a valid adress to retransmite, perhaps in Odoo is not set up for this company or is invalid, please resolve this transaction manually.")
+                cur.execute("UPDATE electrum_payments SET transferred=0 WHERE oid=%d;"%(oid)) 
+                continue
             seller_total = ( 1.e6 * float(amount) * (1 - float(market_fee) ) ) - 1.e3
 	    market_total = 1.e6 * float(amount) * (float(market_fee))
             seller_total = int(seller_total)
             market_total = int(market_total)
             logging.info("Init transfer\nReference: %s\nMerchant Address : %s\nAmount : %s\n" %(reference, seller_address, seller_total))
-            if (not seller_address) or (seller_address is False):
-                logging.error("I have not a valid adress to retransmite, perhaps in Odoo is not set up for this company or is invalid, please resolve this transaction manually.")
-                cur.execute("UPDATE electrum_payments SET transferred=1 WHERE oid=%d;"%(oid)) 
-                continue
             if market_total and seller_total > 0:
                 output = [('address', seller_address, int(seller_total)),('address', market_address, int(market_total))]
             elif seller_total > 0:
@@ -344,10 +330,10 @@ def db_thread():
                 logging.info("SUCCES. The transactions has been broadcasted.")
                 cur.execute("UPDATE electrum_payments SET transferred=1 WHERE oid=%d;"%(oid)) 
             else:
-    	        logging.error("FAILURE. The transactions have not sent, Please resolve the transactions manually.")
+    	        logging.error("FAILURE: The transactions have not sent.")
                 logging.error("Delaying SEND %s fairs to the address %s" %(seller_total, seller_address ) )
         conn.commit()
-        #time.sleep(1)
+        #time.sleep(2)
     conn.commit()
     conn.close()
     logging.debug("Database closed")
@@ -365,7 +351,6 @@ if __name__ == '__main__':
     out_queue = Queue.Queue()
     # start network
     c = electrum_fair.SimpleConfig({'wallet_path':wallet_path})
-    c.set_key("rpcport", 7777)
     daemon_socket = electrum_fair.daemon.get_daemon(c, True)
     network = electrum_fair.NetworkProxy(daemon_socket, config)
     network.start()

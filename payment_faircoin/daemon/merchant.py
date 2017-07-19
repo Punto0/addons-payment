@@ -28,11 +28,14 @@ import Queue
 import sqlite3
 import urllib
 import logging
+#from decimal import Decimal
 
-import electrum_fair
-from electrum_fair import util, bitcoin
-from electrum_fair.util import NotEnoughFunds, InvalidPassword
-electrum_fair.set_verbosity(True)
+import electrumfair
+from electrumfair import util, bitcoin, daemon, WalletStorage, Wallet, Network
+from electrumfair.util import NotEnoughFunds, InvalidPassword
+from electrumfair.util import print_msg, json_encode
+from electrumfair.bitcoin import COIN, TYPE_ADDRESS
+electrumfair.set_verbosity(True)
 
 import ConfigParser
 config = ConfigParser.ConfigParser()
@@ -49,9 +52,9 @@ expired_url = config.get('callback','expired')
 cb_password = config.get('callback','password')
 
 wallet_path = config.get('electrum','wallet_path')
-
 seed = config.get('electrum','seed')
 password = config.get('electrum', 'password')
+
 market_address = config.get('market','FAI_address')
 market_fee = config.get('market','fee')
 network_fee = config.get('network','fee')
@@ -84,11 +87,11 @@ def check_create_table(conn):
         data = c.fetchall()
         for item in data:
             oid, address, amount, paid, item_number, confirmations = item
-            with wallet.lock:
-                logging.info("New payment request in file :\nReference : %s\nPayment address : %s\nAmount : %f" %(item_number,address,float(amount)))
-                pending_requests[address] = {'requested':float(amount), 'confirmations':int(confirmations)}
-                wallet.synchronizer.subscribe_to_addresses([address])
-                wallet.up_to_date = False
+            #with wallet.lock:
+            logging.info("New payment request in file :\nReference : %s\nPayment address : %s\nAmount : %f" %(item_number,address,float(amount)))
+            pending_requests[address] = {'requested':float(amount), 'confirmations':int(confirmations)}
+            callback = lambda response: logging.debug(json_encode(response.get('result')))
+            network.send([('blockchain.address.subscribe',[address])], callback)
 
 def row_to_dict(x):
     return {
@@ -108,29 +111,12 @@ def row_to_dict(x):
 # this process detects when addresses have received payments
 def on_wallet_update():
     for addr, v in pending_requests.items():
-        h = wallet.history.get(addr, [])
-        requested_amount = v.get('requested')
+        amount = v.get('requested')
         requested_confs  = v.get('confirmations')
-        value = 0
-        logging.debug("Checking balance %s" %addr) 
-        for tx_hash, tx_height in h:
-            tx = wallet.transactions.get(tx_hash)
-            if not tx: continue
-            if wallet.get_confirmations(tx_hash)[0] < requested_confs: continue
-            try:
-        	if not tx.outputs: continue
-            except Exception:
-                continue
-
-            for o in tx.outputs:
-                o_type, o_address, o_value = o
-                if o_address == addr:
-                    value += o_value
-        #c, u ,x = wallet.get_addr_balance(addr)
-        s = (value)/1.e6
-        #logging.debug("Address: %s -- Balance : %s -- Requested : %s " %(addr, s, requested_amount) )
-        #logging.debug("Confirmed: %s -- Unmature: %s -- Uncofirmed: %s" %(c,u, x) )        
-        if s>= requested_amount: 
+        out = network.synchronous_get(('blockchain.address.get_balance', [addr]))
+        logging.debug("out: %s" %out)
+        #out["unconfirmed"] = str(Decimal(out["unconfirmed"])/COIN)
+        if out["confirmed"] > 0: 
             logging.debug("Payment Detected in address: %s. Adding to queue.", addr)
             out_queue.put( ('payment', addr))
 
@@ -139,7 +125,10 @@ def do_stop(password):
     if password != my_password:
         return "wrong password"
     stopping = True
-    logging.debug("Stopping")    
+    wallet.stop_threads()
+    wallet.close_wallet(wallet_path)
+    network.close()
+    logging.debug("Stopped")    
     return "ok"
 
 def process_request(amount, confirmations, expires_in, password, item_number, seller_address):
@@ -153,28 +142,16 @@ def process_request(amount, confirmations, expires_in, password, item_number, se
         expires_in = float(expires_in)
     except Exception:
         return "incorrect parameters"
-    done = False
-    account = wallet.default_account()
-    while not done:
-        pubkeys = account.derive_pubkeys(0, num)
-        addr = account.pubkeys_to_address(pubkeys)
-        num += 1
-        if wallet.is_empty(addr) and not addr in pending_requests:
-            done = True
-    #addr = wallet.get_unused_address(account) # Esto lanza una excepcion en electrum lib
-    if num > 500:
-        num = 0
-    wallet.add_address(addr)
+    addr = wallet.get_unused_address() 
     if not bitcoin.is_address(seller_address):
         logging.warning("Address not valid %s" %seller_address)
         seller_address = ''
-
+    logging.debug("Address generated : %s" %addr) 
     out_queue.put( ('request', (addr, amount, confirmations, expires_in, item_number, seller_address) ))
     message = "Order %s at Fairmarket" %item_number
     uri = util.create_URI(addr, 1.e6 * float(amount), message)
     logging.debug("Returning to Odoo:\nAddress generated: %s\nURI : %s " %(addr, uri) )
     return addr, uri
-
 
 def do_dump(password):
     if password != my_password:
@@ -185,7 +162,6 @@ def do_dump(password):
     cur.execute("SELECT oid, * FROM electrum_payments;")
     data = cur.fetchall()
     return map(row_to_dict, data)
-
 
 def getrequest(oid, password):
     if password != my_password:
@@ -198,7 +174,6 @@ def getrequest(oid, password):
     data = cur.fetchone()
     return row_to_dict(data)
 
-
 def send_command(cmd, params):
     import jsonrpclib
     server = jsonrpclib.Server('http://%s:%d'%(my_host, my_port))
@@ -207,7 +182,6 @@ def send_command(cmd, params):
     except socket.error:
         logging.error("Can not connect to the server.")
         return 1
-        
     try:
         out = f(*params)
     except socket.error:
@@ -220,26 +194,28 @@ def db_thread():
     # create table if needed
     check_create_table(conn)
     while not stopping:
+        logging.debug("Start db_thread") 
         cur = conn.cursor()
         # read pending requests from table
         cur.execute("SELECT address, amount, confirmations, item_number FROM electrum_payments WHERE paid IS NULL;")
         data = cur.fetchall()
-        
         # add pending requests to the wallet
         for item in data: 
             addr, amount, confirmations, item_number = item
             if addr in pending_requests: 
                 continue
             else:
-                with wallet.lock:
-                    logging.info("New payment request added:\nReference : %s\nPayment address : %s\nAmount : %f" %(item_number,addr,float(amount)))
-                    pending_requests[addr] = {'requested':float(amount), 'confirmations':int(confirmations)}
-                    wallet.synchronizer.subscribe_to_addresses([addr])
-                    wallet.up_to_date = False
-
-        try:
+                logging.info("New payment request added:\nReference : %s\nPayment address : %s\nAmount : %f" %(item_number,addr,float(amount)))
+                pending_requests[addr] = {'requested':float(amount), 'confirmations':int(confirmations)}
+                callback = lambda response: logging.debug("Callback received : " + json_encode(response))
+                network.send([('blockchain.address.subscribe',[addr])], callback)
+        on_wallet_update()
+        if out_queue.empty():
+          cmd=''
+        else:
+          try:
             cmd, params = out_queue.get(True, 10)
-        except Queue.Empty:
+          except Queue.Empty:
             cmd = ''
 
         if cmd == 'payment':
@@ -303,29 +279,29 @@ def db_thread():
                 logging.error("I have not a valid adress to retransmite, perhaps in Odoo is not set up for this company or is invalid, please resolve this transaction manually.")
                 cur.execute("UPDATE electrum_payments SET transferred=0 WHERE oid=%d;"%(oid)) 
                 continue
-            seller_total = ( 1.e6 * float(amount) * (1 - float(market_fee) ) ) - 1.e3
-	    market_total = 1.e6 * float(amount) * (float(market_fee))
+            seller_total = ( 1.e8 * float(amount) * (1 - float(market_fee) ) ) - 226000 
+	    market_total = 1.e8 * float(amount) * (float(market_fee))
             seller_total = int(seller_total)
             market_total = int(market_total)
             logging.info("Init transfer\nReference: %s\nMerchant Address : %s\nAmount : %s\n" %(reference, seller_address, seller_total))
             if market_total and seller_total > 0:
-                output = [('address', seller_address, int(seller_total)),('address', market_address, int(market_total))]
+                output = [(TYPE_ADDRESS, seller_address, int(seller_total)),(TYPE_ADDRESS, market_address, int(market_total))]
             elif seller_total > 0:
-                output = [('address', seller_address, int(seller_total))] 
+                output = [(TYPE_ADDRESS, seller_address, int(seller_total))] 
             else:
                 logging.info("Free payment. Not making the transaction")
                 cur.execute("UPDATE electrum_payments SET transferred=1 WHERE oid=%d;"%(oid))
                 continue   
             try:  
-                tx = wallet.mktx(output, password)
+                tx = wallet.mktx(output, password, c)
 	    except NotEnoughFunds:	
 	        logging.warning("Delaying the transaction. Not enough funds confirmed to make the transactions.")
         	break
             except InvalidPassword:
-                logging.warning("Incorrect wallet password")
+                logging.warning("Incorrect wallet password %s" %password)
                 break
             # Here we go...
-            rec_tx_state, rec_tx_out = wallet.sendtx(tx)
+            rec_tx_state, rec_tx_out = network.broadcast(tx,60)
 	    if rec_tx_state:
                 logging.info("SUCCES. The transactions has been broadcasted.")
                 cur.execute("UPDATE electrum_payments SET transferred=1 WHERE oid=%d;"%(oid)) 
@@ -333,12 +309,12 @@ def db_thread():
     	        logging.error("FAILURE: The transactions have not sent.")
                 logging.error("Delaying SEND %s fairs to the address %s" %(seller_total, seller_address ) )
         conn.commit()
-        #time.sleep(2)
+        time.sleep(60)
     conn.commit()
     conn.close()
     logging.debug("Database closed")
-    
-
+    logging.debug("---------------------------------")
+   
 if __name__ == '__main__':
     
     if len(sys.argv) > 1:
@@ -346,37 +322,31 @@ if __name__ == '__main__':
         params = sys.argv[2:]
         ret = send_command(cmd, params)
         sys.exit(ret)
+    logging.debug(" ")
+    logging.debug(" ")
+    logging.debug(" ")
     logging.debug("---------------------------------")
     logging.debug("Starting payment daemon")
     out_queue = Queue.Queue()
+
     # start network
-    c = electrum_fair.SimpleConfig({'wallet_path':wallet_path})
-    daemon_socket = electrum_fair.daemon.get_daemon(c, True)
-    network = electrum_fair.NetworkProxy(daemon_socket, config)
+    c = electrumfair.SimpleConfig()
+    network = Network(c)
     network.start()
-    n = 0
+
     # wait until connected
-    while (network.is_connecting() and (n < 100)):
-        time.sleep(0.5)
-        n = n + 1
-        logging.debug(".")
-
+    while network.is_connecting():
+        time.sleep(0.1)
     if not network.is_connected():
-        logging.error("Can not init Electrum Network. Exiting.")
-        #sys.exit(1)
+        print_msg("daemon is not connected")
+        sys.exit(1)
 
-    # create wallet
-    storage = electrum_fair.WalletStorage(wallet_path)
-    if not storage.file_exists:
-        logging.debug("creating wallet file")
-        wallet = electrum_fair.wallet.Wallet(storage)
-    else:
-        wallet = electrum_fair.wallet.Wallet(storage)
-
-    #wallet.synchronize = lambda: None # prevent address creation by the wallet
-    wallet.change_gap_limit(100)  
+    # Init the wallet
+    storage = WalletStorage(wallet_path)
+    #storage.put('wallet_type', 'standard')
+    #storage.put('seed', seed)
+    wallet = Wallet(storage)
     wallet.start_threads(network)
-    network.register_callback('updated', on_wallet_update)
 
     # server thread
     from jsonrpclib.SimpleJSONRPCServer import SimpleJSONRPCServer
@@ -386,6 +356,7 @@ if __name__ == '__main__':
     server.register_function(getrequest, 'getrequest')
     server.register_function(do_stop, 'stop')
     server.socket.settimeout(1)
+
     # Database thread
     threading.Thread(target=db_thread, args=()).start()
     while not stopping:
@@ -393,7 +364,3 @@ if __name__ == '__main__':
             server.handle_request()
         except socket.timeout:
             continue
-    
-    network.stop_daemon()
-    if network.is_connected():
-        time.sleep(1)

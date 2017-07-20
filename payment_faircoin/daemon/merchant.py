@@ -90,8 +90,8 @@ def check_create_table(conn):
             #with wallet.lock:
             logging.info("New payment request in file :\nReference : %s\nPayment address : %s\nAmount : %f" %(item_number,address,float(amount)))
             pending_requests[address] = {'requested':float(amount), 'confirmations':int(confirmations)}
-            callback = lambda response: logging.debug(json_encode(response.get('result')))
-            network.send([('blockchain.address.subscribe',[address])], callback)
+            #callback = lambda response: logging.debug(json_encode(response.get('result')))
+            #network.send([('blockchain.address.subscribe',[address])], callback)
 
 def row_to_dict(x):
     return {
@@ -114,10 +114,9 @@ def on_wallet_update():
         amount = v.get('requested')
         requested_confs  = v.get('confirmations')
         out = network.synchronous_get(('blockchain.address.get_balance', [addr]))
-        logging.debug("out: %s" %out)
-        #out["unconfirmed"] = str(Decimal(out["unconfirmed"])/COIN)
-        if out["confirmed"] > 0: 
-            logging.debug("Payment Detected in address: %s. Adding to queue.", addr)
+        logging.debug("Check address : %s -- : Request : %s -- Result :  %s" %(addr, amount * COIN, out))
+        if ( out["confirmed"] >= (amount * COIN) ): 
+            logging.debug("Payment Detected in address: %s. Adding to queue for processing it.", addr)
             out_queue.put( ('payment', addr))
 
 def do_stop(password):

@@ -209,7 +209,6 @@ class TxFaircoin(osv.Model):
     def _faircoin_form_validate(self, cr, uid, tx, data, context=None):
         _logger.debug('Begin faircoin_form_validate')
         _logger.debug('Data : %s' %data)
-        
         status = data.get('payment_status')
 	reference = data.get('item_number')
         tx = self._faircoin_form_get_tx_from_data(cr, uid, data, context=context)
@@ -227,7 +226,7 @@ class TxFaircoin(osv.Model):
             #self.pool['sale.order'].force_quotation_send(cr, SUPERUSER_ID, [order.id], context=context)
             return True
         elif status in ['Pending']:
-            _logger.info('tx state from pending, expired to cancel %s' %(reference))
+            _logger.info('tx state from pending to cancel %s' %(reference))
             tx.write({
                 'state': 'pending',
                 'faircoin_txn_id': reference,
@@ -235,9 +234,9 @@ class TxFaircoin(osv.Model):
             })
             return True
         elif status in ['Expired']:
-            _logger.info('tx state from draft to pending %s' % (reference))
+            _logger.info('tx state from pending to expired %s' % (reference))
             tx.write({
-                'state': 'draft',
+                'state': 'cancel',
                 'faircoin_txn_id': reference,
                 'date_validate' : fields.datetime.now(),
             })

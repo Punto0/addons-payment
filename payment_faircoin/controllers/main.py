@@ -28,14 +28,14 @@ _logger = logging.getLogger(__name__)
 
 class FaircoinController(http.Controller):
     _notify_url = '/payment/faircoin/ipn/'
-    _return_url = '/payment/faircoin/dpn/'
+    _return_url = '/payment/faircoin/error/'
     _cancel_url = '/payment/faircoin/cancel/'
     _payment_form_url = '/payment/faircoin/payment_form/'
-    _feedback_url = '/payment/faircoin/feedback'
+    _feedback_url = '/payment/faircoin/feedback' # ¿Se usa pra algo?
     # ToDo: Esto habra que pasarlo a la configuracion de odoo
     merchant_host = 'http://localhost:8059'
     merchant_password = 'kljk540sbcnm903053209n'
-    expires_in = 1440 # minutes
+    expires_in = 240 # minutes
     confirmations = 0	
     
     def _get_return_url(self, **post):
@@ -47,33 +47,6 @@ class FaircoinController(http.Controller):
         return return_url
     
     def faircoin_validate_data(self, **post):
-        """IPN: three steps validation to ensure data correctness
-
-        - step 1: return an empty HTTP 200 response -> will be done at the end
-           by returning ''
-        - step 2: POST the complete, unaltered message back to Electrum (preceded
-           by cmd=_notify-validate), with same encoding
-        - step 3: electrum send either VERIFIED or INVALID (single word)
-
-        Once data is validated, process it.
-
-        new_post = dict(post, cmd='_notify-validate')
-
-        electrum_urls = request.registry['payment.acquirer']._get_electrum_urls(cr, uid, tx and tx.acquirer_id and tx.acquirer_id.environment or 'prod', context=context)
-        validate_url = electrum_urls['electrum_form_url']
-        urequest = urllib2.Request(validate_url, werkzeug.url_encode(new_post))
-        uopen = urllib2.urlopen(urequest)
-        resp = uopen.read()
-
-        if resp == 'VERIFIED':
-            _logger.info('Electrum: validated data')
-            res = request.registry['payment.transaction'].form_feedback(cr, SUPERUSER_ID, post, 'electrum', context=context)
-        elif resp == 'INVALID':
-            _logger.warning('Electrum: answered INVALID on data verification')
-        else:
-            _logger.warning('Electrum: unrecognized electrum answer, received %s instead of VERIFIED or INVALID' % resp.text)
-        cr, uid, context = request.cr, request.uid, request.context
-	res = False """
         cr, uid, context = request.cr, SUPERUSER_ID, request.context        
         reference = post.get('item_number')
         tx = None
@@ -103,17 +76,16 @@ class FaircoinController(http.Controller):
             'payment_status': 'Completed',
             'item_number' : data_decoded['item_number']	
         }	
-        #_logger.debug('data posted to : %s' %data_post)
         request.registry['payment.transaction'].form_feedback(cr, uid, data_post, 'faircoin', context)
         return 'OK' # Retorna respuesta al demonio
 
-    # Sin uso, creo, seria la url donde retorna paypal...
-    @http.route('/payment/faircoin/dpn', type='http', auth="none")
-    def faircoin_dpn(self, **post):
-        _logger.debug('Beginning DPN form_feedback with post data %s', pprint.pformat(post))  # debug
+    # Cuando falla el demonio, redirige aquí
+    # ToDo: crear una página de error y notificar a los admins del error por mail
+    @http.route('/payment/faircoin/error', type='http', auth="none")
+    def faircoin_error(self, **post):
+        _logger.warning('Beginning ERROR form with post data %s', pprint.pformat(post))
         return_url = self._get_return_url(**post)
-        self.faircoin_validate_data(**post)
-        return werkzeug.utils.redirect(return_url)
+        return werkzeug.utils.redirect('/')
 
     # LLamado por el daemon para cancelar una orden 
     @http.route('/payment/faircoin/cancel', type='http', auth="none", methods=['POST'])
@@ -121,26 +93,25 @@ class FaircoinController(http.Controller):
         cr, uid, context = request.cr, SUPERUSER_ID, request.context
         data_raw = request.httprequest.get_data()	
         data_decoded = urlparse.parse_qs(data_raw)
-        #_logger.debug('Data decoded : %s' %data_decoded)
+        if data_decoded['paid']:
+            return 'ERROR'
         _logger.debug('Beging cancel for reference %s' %data_decoded['item_number'])        
         data_post = {
           'payment_status': 'Expired',
           'cancelling_reason' : 'Funds has not arrive at time',
           'item_number' : data_decoded['item_number']	
         }	
-        #_logger.debug('data posted to : %s' %data_post)
         request.registry['payment.transaction'].form_feedback(cr, uid, data_post, 'faircoin', context)
         return 'OK'
  
+    # esto sirve para algo? Cuando llama a esta funcion y que fin tiene?
     @http.route('/payment/faircoin/form_validate', type='http', auth='none')
     def faircoin_form_feedback(self, **post):
-        #cr, uid, context, session = request.cr, SUPERUSER_ID, request.context, request.session
         _logger.debug('IMPORTANTE: Called /payment/faircoin/form_validate with post data %s' %pprint.pformat(post))  # debug
-        #request.registry['payment.transaction'].form_feedback(cr, uid, post, 'electrum', context)
-
         return werkzeug.utils.redirect(post.pop('return_url', '/'))
 
-    # LLamado por Odoo tras elegir Faircoin como metodo de pago 
+    # LLamado por Odoo tras elegir Faircoin como metodo de pago.
+    # Solicita al demonio una nueva dirección y renderiza la pantalla de pagos.  
     @http.route('/payment/faircoin/payment_form', type='http', auth="public", website="True")
     def faircoin_payment_form(self, **post):
         """ Render the faircoin payment screen and notify the daemon with a new request """
@@ -195,9 +166,10 @@ class FaircoinController(http.Controller):
             # Setea como pending la transaccion
             data_post = {
               'payment_status': 'Pending',
-              'item_number' : reference
+              'item_number' : reference,
+              'address': address
             }
-            request.registry['payment.transaction'].form_feedback(cr, uid, data_post, 'faircoin', context) # Da error
+            request.registry['payment.transaction'].form_feedback(cr, uid, data_post, 'faircoin', context)
 
         return request.website.render('payment_faircoin.payment_form', {
                 'amount' : amount,

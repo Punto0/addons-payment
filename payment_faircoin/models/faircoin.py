@@ -29,7 +29,6 @@ class AcquirerFaircoin(osv.Model):
                 'faircoin_payment_form_url': '/payment/faircoin/payment_form',
                 'electrum_daemon_url': 'http://localhost:8059',
             }
-#        base_url = self.pool['ir.config_parameter'].get_param(cr, SUPERUSER_ID, 'web.base.url')
         else:
             return {
                 'faircoin_payment_form_url': '/payment/faircoin/payment_form',
@@ -139,6 +138,7 @@ class TxFaircoin(osv.Model):
     _columns = {
         'faircoin_txn_id': fields.char('Transaction ID'),
         'faircoin_txn_type': fields.char('Transaction type'),
+        'faircoin_address': fields.char('Payment address'),
     }
 
     # --------------------------------------------------
@@ -148,7 +148,6 @@ class TxFaircoin(osv.Model):
     def _faircoin_form_get_tx_from_data(self, cr, uid, data, context=None):
         _logger.debug('Begin faircoin_form_get_tx_from_data. Data received %s' %data)
 	reference = data.get('item_number')
-        #paid = data.get("paid")
         if not reference:
             error_msg = 'Faircoin: received data with missing reference (%s)' %reference
             _logger.error(error_msg)
@@ -211,10 +210,7 @@ class TxFaircoin(osv.Model):
         _logger.debug('Data : %s' %data)
         status = data.get('payment_status')
 	reference = data.get('item_number')
-        tx = self._faircoin_form_get_tx_from_data(cr, uid, data, context=context)
-        #order_id = self.pool.get('sale.order').search(cr, uid, [('name','in',reference)], context=context)
-        #order = self.pool.get('sale.order').browse(cr, uid, order_id, context=context)
-        #txr = order.payment_tx_id
+        # tx = self._faircoin_form_get_tx_from_data(cr, uid, data, context=context)
         if status in ['Completed']:
             _logger.info('tx set done for reference %s' %(reference))
             tx.write({
@@ -222,19 +218,18 @@ class TxFaircoin(osv.Model):
                 'faircoin_txn_id': reference,
                 'date_validate' : fields.datetime.now(),
             })
-            #self.pool['sale.order'].action_button_confirm(cr, SUPERUSER_ID, [order.id], context=context)
-            #self.pool['sale.order'].force_quotation_send(cr, SUPERUSER_ID, [order.id], context=context)
             return True
         elif status in ['Pending']:
-            _logger.info('tx state from pending to cancel %s' %(reference))
+            _logger.info('tx state set to pending  %s' %(reference))
             tx.write({
                 'state': 'pending',
                 'faircoin_txn_id': reference,
                 'date_validate' : fields.datetime.now(),
+                'faircoin_address': data.get('address'),
             })
             return True
         elif status in ['Expired']:
-            _logger.info('tx state from pending to expired %s' % (reference))
+            _logger.info('tx state set to cancel %s' % (reference))
             tx.write({
                 'state': 'cancel',
                 'faircoin_txn_id': reference,
@@ -250,164 +245,4 @@ class TxFaircoin(osv.Model):
                 'faircoin_txn_id': reference,
                 'date_validate' : fields.datetime.now(),
             })
-            return False 
-
-    # --------------------------------------------------
-    # SERVER2SERVER RELATED METHODS
-    # --------------------------------------------------
-"""
-    def _faircoin_try_url(self, request, tries=3, context=None):
-        Try to contact Electrum. Due to some issues, internal service errors
-        seem to be quite frequent. Several tries are done before considering
-        the communication as failed.
-
-         .. versionadded:: pre-v8 saas-3
-         .. warning::
-
-            Experimental code. You should not use it before OpenERP v8 official
-            release.
-        
-        done, res = False, None
-        while (not done and tries):
-            try:
-                res = urllib2.urlopen(request)
-                done = True
-            except urllib2.HTTPError as e:
-                res = e.read()
-                e.close()
-                if tries and res and json.loads(res)['name'] == 'INTERNAL_SERVICE_ERROR':
-                    _logger.warning('Failed contacting Electrum, retrying (%s remaining)' % tries)
-            tries = tries - 1
-        if not res:
-            pass
-            # raise openerp.exceptions.
-        result = res.read()
-        res.close()
-        return result
-
-    def _electrum_s2s_send(self, cr, uid, values, cc_values, context=None):
-        
-         .. versionadded:: pre-v8 saas-3
-         .. warning::
-
-            Experimental code. You should not use it before OpenERP v8 official
-            release.
-        
-        tx_id = self.create(cr, uid, values, context=context)
-        tx = self.browse(cr, uid, tx_id, context=context)
-
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer %s' % tx.acquirer_id._electrum_s2s_get_access_token()[tx.acquirer_id.id],
-        }
-        data = {
-            'intent': 'sale',
-            'transactions': [{
-                'amount': {
-                    'total': '%.2f' % tx.amount,
-                    'currency': tx.currency_id.name,
-                },
-                'description': tx.reference,
-            }]
-        }
-        if cc_values:
-            data['payer'] = {
-                'payment_method': 'credit_card',
-                'funding_instruments': [{
-                    'credit_card': {
-                        'number': cc_values['number'],
-                        'type': cc_values['brand'],
-                        'expire_month': cc_values['expiry_mm'],
-                        'expire_year': cc_values['expiry_yy'],
-                        'cvv2': cc_values['cvc'],
-                        'first_name': tx.partner_name,
-                        'last_name': tx.partner_name,
-                        'billing_address': {
-                            'line1': tx.partner_address,
-                            'city': tx.partner_city,
-                            'country_code': tx.partner_country_id.code,
-                            'postal_code': tx.partner_zip,
-                        }
-                    }
-                }]
-            }
-        else:
-            # TODO: complete redirect URLs
-            data['redirect_urls'] = {
-                # 'return_url': 'http://example.com/your_redirect_url/',
-                # 'cancel_url': 'http://example.com/your_cancel_url/',
-            },
-            data['payer'] = {
-                'payment_method': 'electrum',
-            }
-        data = json.dumps(data)
-
-        request = urllib2.Request('https://api.sandbox.electrum.com/v1/payments/payment', data, headers)
-        result = self._electrum_try_url(request, tries=3, context=context)
-        return (tx_id, result)
-
-    def _electrum_s2s_get_invalid_parameters(self, cr, uid, tx, data, context=None):
-        
-         .. versionadded:: pre-v8 saas-3
-         .. warning::
-
-            Experimental code. You should not use it before OpenERP v8 official
-            release.
-        
-        invalid_parameters = []
-        return invalid_parameters
-
-    def _electrum_s2s_validate(self, cr, uid, tx, data, context=None):
-        
-         .. versionadded:: pre-v8 saas-3
-         .. warning::
-
-            Experimental code. You should not use it before OpenERP v8 official
-            release.
-        
-        values = json.loads(data)
-        status = values.get('state')
-        if status in ['approved']:
-            _logger.info('Validated Electrum s2s payment for tx %s: set as done' % (tx.reference))
-            tx.write({
-                'state': 'done',
-                'date_validate': values.get('udpate_time', fields.datetime.now()),
-                'electrum_txn_id': values['id'],
-            })
-            return True
-        elif status in ['pending', 'expired']:
-            _logger.info('Received notification for Electrum s2s payment %s: set as pending' % (tx.reference))
-            tx.write({
-                'state': 'pending',
-                # 'state_message': data.get('pending_reason', ''),
-                'electrum_txn_id': values['id'],
-            })
-            return True
-        else:
-            error = 'Received unrecognized status for Electrum s2s payment %s: %s, set as error' % (tx.reference, status)
-            _logger.info(error)
-            tx.write({
-                'state': 'error',
-                # 'state_message': error,
-                'electrum_txn_id': values['id'],
-            })
             return False
-
-    def _electrum_s2s_get_tx_status(self, cr, uid, tx, context=None):
-        
-         .. versionadded:: pre-v8 saas-3
-         .. warning::
-
-            Experimental code. You should not use it before OpenERP v8 official
-            release.
-        
-        # TDETODO: check tx.electrum_txn_id is set
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer %s' % tx.acquirer_id._electrum_s2s_get_access_token()[tx.acquirer_id.id],
-        }
-        url = 'https://api.sandbox.electrum.com/v1/payments/payment/%s' % (tx.electrum_txn_id)
-        request = urllib2.Request(url, headers=headers)
-        data = self._electrum_try_url(request, tries=3, context=context)
-        return self.s2s_feedback(cr, uid, tx.id, data, context=context)
-"""

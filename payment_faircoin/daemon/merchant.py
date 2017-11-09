@@ -116,9 +116,9 @@ def on_wallet_update():
         try:
             out =  network.synchronous_get(('blockchain.address.get_balance', [addr]))
         except BaseException as e:
-            logging.errot("Server din dot answer")
+            logging.error("Can not retrieve balance: %s" %e)
             return
-        logging.debug("Check address : %s -- : Request : %s -- Result :  %s" %(addr, amount * COIN, out))
+        #logging.debug("Check address : %s -- : Request : %s -- Result :  %s" %(addr, amount * COIN, out))
         if ( out["confirmed"] >= (amount * COIN) ): 
             logging.debug("Payment Detected in address: %s. Adding to queue for processing it.", addr)
             out_queue.put( ('payment', addr))
@@ -145,11 +145,16 @@ def process_request(amount, confirmations, expires_in, password, item_number, se
         expires_in = float(expires_in)
     except Exception:
         return "incorrect parameters"
-    addr = wallet.get_unused_address() 
+    list_addr = wallet.get_receiving_addresses()
+    for a in list_addr:
+        if a not in pending_requests:
+           bal = wallet.get_addr_balance(a)
+           if bal[0] + bal[1] + bal[2] == 0: 
+               addr = a
+               break
     if not bitcoin.is_address(seller_address):
         logging.warning("Address not valid %s" %seller_address)
         seller_address = ''
-    logging.debug("Address generated : %s" %addr) 
     out_queue.put( ('request', (addr, amount, confirmations, expires_in, item_number, seller_address) ))
     message = "Order %s at Fairmarket" %item_number
     uri = util.create_URI(addr, 1.e8 * float(amount), message)
@@ -197,7 +202,7 @@ def db_thread():
     # create table if needed
     check_create_table(conn)
     while not stopping:
-        logging.debug("Start db_thread") 
+        #logging.debug("Start db_thread") 
         cur = conn.cursor()
         # read pending requests from table
         cur.execute("SELECT address, amount, confirmations, item_number FROM electrum_payments WHERE paid IS NULL;")
@@ -313,7 +318,7 @@ def db_thread():
                 logging.error("Delaying SEND %s fairs to the address %s" %(seller_total, seller_address ) )
                 cur.execute("UPDATE electrum_payments SET transferred=0 WHERE oid=%d;"%(oid)) 
         conn.commit()
-        time.sleep(60)
+        time.sleep(0.1)
     conn.commit()
     conn.close()
     logging.debug("Database closed")

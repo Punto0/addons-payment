@@ -48,37 +48,40 @@
                    <li class="text-primary">Payment<span class="chevron"></span></li>
                    <li class="text-muted">Confirmation<span class="chevron"></span></li>
                  </ul>
-                   <div class="oe_faircoin_tx_status" t-att-data-order-id="order.id" style="background-color:#f0f0fa">
-                   <h4>Thank you for your order (Ref: <t t-esc="order.name" />) at FairMarket.</h4>
-                   <p>Waiting for payment transaction. This page will be updated when the payment has been confirmed.</p>
-               </div> 
-               <div class="col-md-8 oe_cart">
+               </div>
+                 <div class="col-md-8 oe_cart">
                    <center>
+                   <div class="oe_faircoin_tx_status" t-att-data-order-id="order.id" style="background-color:#f0f0fa">
+                     <h4>Thank you for your order (Ref: <t t-esc="order.name" />) at FairMarket.</h4>
+                     <p>Waiting for payment transaction. This page will be updated when the payment has been confirmed.</p>
+                   </div> 
                    <div class="my_payment_form" style="background-color:#f0f0fa" t-if="order.amount_total"> 
                       <div class="oe_clearfix"/>
-                          <h4>Please, pay with this FairCoin transaction :</h4>
-                          <h3>Send  <strong><t t-esc="order.amount_total" /></strong>  faircoins</h3> 
-                          <h3>to the address :  <strong><t t-esc="order.fcaddress" /></strong></h3>
-                          <span t-field="order.qrcode" t-field-options='{"widget": "image"}' />
-                   </div></center>
+                      <h4>Please, pay with this FairCoin transaction before four hours :</h4>
+                      <h3>Send  <strong><t t-esc="order.amount_total" /></strong>  faircoins</h3> 
+                      <h3>to the address :  <strong><t t-esc="order.fcaddress" /></strong></h3>
+                      <span t-field="order.qrcode" t-field-options='{"widget": "image"}' />
+                      <h4>Your order will be cancelled if the payment is not done before four hours</h4>
+                   </div>
+                   </center>
                    <div class="oe_clearfix"/>
-               </div>
-               <div class="my_payment_form" style="background-color:#f0f0fa" t-if="order.amount_total == 0">
+                 </div>
+                 <div class="my_payment_form" style="background-color:#f0f0fa" t-if="order.amount_total == 0">
                       <p>Your partner will comunicate with you as soon as posible.</p>
-               </div>
-               <div class="col-md-3 col-md-offset-1 text-muted" id="right_column">
+                 </div>
+                 <div class="col-md-3 col-md-offset-1 text-muted" id="right_column">
                   <h4>Your partner:</h4>
                   <span t-field="order.company_id.logo_web" t-field-options='{"widget": "image"}' />
                   <div t-field="order.company_id.partner_id" t-field-options='{
                     "widget": "contact",
                     "fields": ["address", "name", "phone", "email"]
                     }'/>
-                <h4>Bill To:</h4>
-                <div t-field="order.partner_invoice_id" t-field-options='{
+                  <h4>Bill To:</h4>
+                  <div t-field="order.partner_invoice_id" t-field-options='{
                     "widget": "contact",
                     "fields": ["address", "name", "phone", "email"]
                     }'/>
-                <t>
+                  <t>
                     <h4 class="mt32">Ship To:</h4>
                     <t t-if="order.partner_shipping_id and order.partner_shipping_id.id != order.partner_invoice_id.id">
                       <div t-field="order.partner_shipping_id" t-field-options='{
@@ -87,10 +90,9 @@
                         }'/>
                     </t>
                     <address t-if="order.partner_shipping_id.id == order.partner_invoice_id.id">Ship to the same address</address>
-                 </t>
+                  </t>
              </div>
           </div>
-        </div>
         </div>
         <div class="oe_structure"/>
     </t>

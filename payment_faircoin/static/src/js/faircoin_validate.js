@@ -20,7 +20,7 @@ $(document).ready(function () {
             }
             else {
                 txt = result.message;
-                txt = result.state + "<h2>Thank you, your transaction has been confirmed.</h2>";
+                txt = "<h2>Your transaction sate is now " + result.state + "</h2><p>" + result.message + "</p>";
                 window.location.replace("/shop/payment/validate");
             }
             tx_node.html(txt);

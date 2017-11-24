@@ -130,6 +130,11 @@ class FaircoinController(http.Controller):
         amount = post.get('amount')
         order_id = request.registry['sale.order'].search(cr, uid, [('name', '=', reference)], context=context)
         order_obj = request.registry['sale.order'].browse(cr, uid, order_id, context=context)
+        for line in order_obj.order_line:
+            # puede que haya el metodo de envio generico de fm  
+            if line.product_id.company_id.id is not 1:
+                company_id = line.product_id.company_id
+                salesman = line.product_id.company_id.user_ids[0] # Cambia el salesman de la orden para que tenga acceso. User: Own leads
         if (order_obj.fcaddress):
             address = order_obj.fcaddress
         else:   
@@ -143,7 +148,7 @@ class FaircoinController(http.Controller):
                  return werkzeug.utils.redirect(return_url) 
             try:
                 # Here we go
-                address, uri = f(amount, self.confirmations, self.expires_in, self.merchant_password, reference, post.get('seller_address'))
+                address, uri = f(amount, self.confirmations, self.expires_in, self.merchant_password, reference, company_id.faircoin_account)
             except socket.error, (value,message): 
                 _logger.error("ERROR: Can not comunicate with the Payment Daemon")
                 _logger.error(" %d %s:" %(value, message))
@@ -162,7 +167,6 @@ class FaircoinController(http.Controller):
             output.seek(0)
             output_s = output.read()
             b64 = base64.b64encode(output_s).decode()
-            order_obj.write({'qrcode': b64, 'fcaddress' : address }, context = context)
             # Setea como pending la transaccion
             data_post = {
               'payment_status': 'Pending',
@@ -170,7 +174,7 @@ class FaircoinController(http.Controller):
               'address': address
             }
             request.registry['payment.transaction'].form_feedback(cr, uid, data_post, 'faircoin', context)
-
+            order_obj.write({'qrcode': b64, 'fcaddress' : address, 'company_id': company_id.id, 'user_id': salesman.id }, context = context)
         return request.website.render('payment_faircoin.payment_form', {
                 'amount' : amount,
                 'address' : address,

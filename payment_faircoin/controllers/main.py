@@ -175,15 +175,8 @@ class FaircoinController(http.Controller):
             }
             request.registry['payment.transaction'].form_feedback(cr, uid, data_post, 'faircoin', context)
             order_obj.write({'qrcode': b64, 'fcaddress' : address, 'company_id': company_id.id, 'user_id': salesman.id }, context = context)
-        self.clear_cart()
         return request.website.render('payment_faircoin.payment_form', {
                 'amount' : amount,
                 'address' : address,
                 'order' : order_obj
                 })
-
-    def clear_cart(self):
-        order = request.website.sale_get_order()
-        if order:
-            for line in order.website_order_line:
-                line.unlink()  

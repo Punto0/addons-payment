@@ -287,7 +287,7 @@ def db_thread():
                 logging.error("I have not a valid adress to retransmite, perhaps in Odoo is not set up for this company or is invalid, please resolve this transaction manually.")
                 cur.execute("UPDATE electrum_payments SET transferred=0 WHERE oid=%d;"%(oid)) 
                 continue
-            seller_total = int( 1.e8 * float(amount) ) - 226000 
+            seller_total = int( 1.e8 * float(amount) ) - 181600
 	    #market_total = 1.e8 * float(amount) * (float(market_fee))
             #seller_total = int(seller_total)
             #market_total = int(market_total)

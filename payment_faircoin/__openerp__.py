@@ -11,6 +11,7 @@
         'views/faircoin.xml',
         'views/payment_acquirer.xml',
         'views/res_config_view.xml',
+        'views/res_company.xml', 
         'data/faircoin.xml',
     ],
     'installable': True,

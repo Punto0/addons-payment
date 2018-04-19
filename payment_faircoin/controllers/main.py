@@ -135,8 +135,10 @@ class FaircoinController(http.Controller):
             if line.product_id.company_id.id is not 1:
                 company_id = line.product_id.company_id
                 salesman = line.product_id.company_id.user_ids[0] # Cambia el salesman de la orden para que tenga acceso. User: Own leads
-        if (order_obj.fcaddress):
-            address = order_obj.fcaddress
+                if company_id and salesman: break 
+        if (order_obj.payment_tx_id.faircoin_address):
+            address = order_obj.payment_tx_id.faircoin_address
+            uri = order_obj.payment_tx_id.uri
         else:   
             headers = {'content-type':'application/json'}
             server = jsonrpclib.Server(self.merchant_host)
@@ -155,31 +157,32 @@ class FaircoinController(http.Controller):
                 return_url = self._get_return_url(**post)
                 _logger.debug("Redirecting to %s" %return_url)
                 return werkzeug.utils.redirect(return_url)  
-    
-            _logger.info('Received Faircoin address : %s and uri : %s for reference: %s' %(address,uri,reference))
-            # Make the qr code image and save it in the database
-            qr = qrcode.QRCode()
-            qr.add_data(uri)
-            qr.make(fit=True)
-            img = qr.make_image()
-            output = cStringIO.StringIO()
-            img.save(output, 'PNG')
-            output.seek(0)
-            output_s = output.read()
-            b64 = base64.b64encode(output_s).decode()
             # Setea como pending la transaccion
             data_post = {
               'payment_status': 'Pending',
               'item_number' : reference,
-              'address': address
+              'address': address,
+              'uri': uri
             }
             request.registry['payment.transaction'].form_feedback(cr, uid, data_post, 'faircoin', context)
-            order_obj.write({'qrcode': b64, 'fcaddress' : address, 'company_id': company_id.id, 'user_id': salesman.id }, context = context)
+            order_obj.write({'company_id': company_id.id, 'user_id': salesman.id }, context = context)
+            _logger.info('Received Faircoin address : %s and uri : %s for reference: %s' %(address,uri,reference))
+        # Make the qr code image and save it in the database
+        qr = qrcode.QRCode()
+        qr.add_data(uri)
+        qr.make(fit=True)
+        img = qr.make_image()
+        output = cStringIO.StringIO()
+        img.save(output, 'PNG')
+        output.seek(0)
+        output_s = output.read()
+        b64 = base64.b64encode(output_s).decode()
         self.clear_cart()
         return request.website.render('payment_faircoin.payment_form', {
                 'amount' : amount,
                 'address' : address,
-                'order' : order_obj
+                'order' : order_obj,
+                'qrcode' : b64 
                 })
 
     def clear_cart(self):

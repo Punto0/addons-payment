@@ -58,9 +58,9 @@
                    <div class="my_payment_form" style="background-color:#f0f0fa" t-if="order.amount_total"> 
                       <div class="oe_clearfix"/>
                       <h4>Please, pay with this FairCoin transaction before four hours :</h4>
-                      <h3>Send  <strong><t t-esc="order.amount_total" /></strong>  faircoins</h3> 
-                      <h3>to the address :  <strong><t t-esc="order.fcaddress" /></strong></h3>
-                      <span t-field="order.qrcode" t-field-options='{"widget": "image"}' />
+                      <h3>Send  <strong><t t-esc="amount" /></strong>  faircoins</h3> 
+                      <h3>to the address :  <strong><t t-esc="address" /></strong></h3>
+                      <span t-field="qrcode" t-field-options='{"widget": "image"}' />
                       <h4>Your order will be cancelled if the payment is not done before four hours</h4>
                    </div>
                    </center>

@@ -139,6 +139,7 @@ class TxFaircoin(osv.Model):
         'faircoin_txn_id': fields.char('Transaction ID'),
         'faircoin_txn_type': fields.char('Transaction type'),
         'faircoin_address': fields.char('Payment address'),
+        'uri': fields.char('URI'),
     }
 
     # --------------------------------------------------

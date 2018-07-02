@@ -90,8 +90,8 @@ def check_create_table(conn):
             #with wallet.lock:
             logging.info("New payment request in file :\nReference : %s\nPayment address : %s\nAmount : %f" %(item_number,address,float(amount)))
             pending_requests[address] = {'requested':float(amount), 'confirmations':int(confirmations)}
-            #callback = lambda response: logging.debug(json_encode(response.get('result')))
-            #network.send([('blockchain.address.subscribe',[address])], callback)
+            callback = lambda response: logging.debug(json_encode(response.get('result')))
+            network.send([('blockchain.address.subscribe',[address])], callback)
 
 def row_to_dict(x):
     return {
@@ -118,8 +118,8 @@ def on_wallet_update():
         except BaseException as e:
             logging.error("Can not retrieve balance: %s" %e)
             return
-        #logging.debug("Check address : %s -- : Request : %s -- Result :  %s" %(addr, amount * COIN, out))
-        if ( out["confirmed"] >= (amount * COIN) ): 
+        logging.debug("Check address : %s -- : Request : %s -- Result :  %s" %(addr, amount * COIN, out['confirmed']))
+        if ( int(out["confirmed"]) >= int( (amount * COIN) ) ): 
             logging.debug("Payment Detected in address: %s. Adding to queue for processing it.", addr)
             out_queue.put( ('payment', addr))
 
@@ -287,7 +287,7 @@ def db_thread():
                 logging.error("I have not a valid adress to retransmite, perhaps in Odoo is not set up for this company or is invalid, please resolve this transaction manually.")
                 cur.execute("UPDATE electrum_payments SET transferred=0 WHERE oid=%d;"%(oid)) 
                 continue
-            seller_total = int( 1.e8 * float(amount) ) - 181600
+            seller_total = int( 1.e8 * float(amount) ) - 1000000
 	    #market_total = 1.e8 * float(amount) * (float(market_fee))
             #seller_total = int(seller_total)
             #market_total = int(market_total)
@@ -299,7 +299,13 @@ def db_thread():
             else:
                 logging.info("Free payment. Not making the transaction")
                 cur.execute("UPDATE electrum_payments SET transferred=1 WHERE oid=%d;"%(oid))
-                continue   
+                continue
+            if seller_total > ( 500 * 1e8 ):
+                logging.info("--------------- WARNING! HUMANS REQUIRED -----------------")             
+                logging.info("SALE MODERATED. CANCELLING RETRANSMITING FUNDS TO MERCHANT.")
+                logging.info("FM Reference: %s\nMerchant Address : %s\nAmount : %s\n" %(reference, seller_address, seller_total))
+                cur.execute("UPDATE electrum_payments SET transferred=1 WHERE oid=%d;"%(oid))
+                continue
             try:  
                 tx = wallet.mktx(output, password, c)
 	    except NotEnoughFunds:	
@@ -318,7 +324,7 @@ def db_thread():
                 logging.error("Delaying SEND %s fairs to the address %s" %(seller_total, seller_address ) )
                 cur.execute("UPDATE electrum_payments SET transferred=0 WHERE oid=%d;"%(oid)) 
         conn.commit()
-        time.sleep(0.1)
+        time.sleep(3)
     conn.commit()
     conn.close()
     logging.debug("Database closed")

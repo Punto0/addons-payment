@@ -22,9 +22,9 @@
 
 import time, sys, socket, os
 import threading
-import urllib2
+import urllib.request as urllib2
 import json
-import Queue
+import queue as Queue
 import sqlite3
 import urllib
 import logging
@@ -37,8 +37,8 @@ from electrumfair.util import print_msg, json_encode
 from electrumfair.bitcoin import COIN, TYPE_ADDRESS
 electrumfair.set_verbosity(True)
 
-import ConfigParser
-config = ConfigParser.ConfigParser()
+import configparser as ConfigParser
+config = ConfigParser.RawConfigParser()
 config.read("merchant.conf")
 
 my_password = config.get('main','password')
@@ -270,7 +270,7 @@ def db_thread():
                 logging.error('ERROR: Reason : %s ' % e.reason)
                 logging.error("PLEASE: SETUP THE ORDER %s MANUALLY IN ODOO. PAID : %s " %(item_number,paid) )
                 cur.execute("UPDATE electrum_payments SET processed=0 WHERE oid=%d;"%(oid))
-            except ValueError, e:
+            except ValueError as e:
                 logging.error(e)
                 logging.error("ERROR: cannot do callback in %s with data %s" %(url, data_json))
                 logging.error("PLEASE: SETUP THE ORDER %s MANUALLY IN ODOO. PAID : %s " %(item_number,paid) )
@@ -308,23 +308,23 @@ def db_thread():
                 continue
             try:  
                 tx = wallet.mktx(output, password, c)
-	    except NotEnoughFunds:	
-	        logging.warning("Delaying the transaction. Not enough funds confirmed to make the transactions.")
-        	break
-            except InvalidPassword:
+            except NotEnoughFunds as e:
+                logging.warning("Delaying the transaction. Not enough funds confirmed to make the transactions.")
+                break
+            except InvalidPassword as e:
                 logging.warning("Incorrect wallet password %s" %password)
                 break
             # Here we go...
             rec_tx_state, rec_tx_out = network.broadcast(tx,60)
-	    if rec_tx_state:
+            if rec_tx_state:
                 logging.info("SUCCES. The transactions has been broadcasted.")
                 cur.execute("UPDATE electrum_payments SET transferred=1 WHERE oid=%d;"%(oid)) 
             else:
-    	        logging.error("FAILURE: The transactions have not sent.")
+                logging.error("FAILURE: The transactions have not sent.")
                 logging.error("Delaying SEND %s fairs to the address %s" %(seller_total, seller_address ) )
                 cur.execute("UPDATE electrum_payments SET transferred=0 WHERE oid=%d;"%(oid)) 
         conn.commit()
-        time.sleep(3)
+        time.sleep(5)
     conn.commit()
     conn.close()
     logging.debug("Database closed")

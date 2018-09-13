@@ -23,12 +23,11 @@
 import time, sys, socket, os
 import threading
 import urllib.request as urllib2
+import urllib.parse
 import json
 import queue as Queue
 import sqlite3
-import urllib.parse
 import logging
-#import requests
 
 import electrumfair
 from electrumfair import util, bitcoin, daemon, WalletStorage, Wallet, Network
@@ -251,15 +250,13 @@ def db_thread():
             headers = {'content-type':'application/html'}
             data = urllib.parse.urlencode({'address': address, 'password':cb_password, 'paid':paid, 'item_number':item_number})
             data = data.encode('ascii')
-            logging.debug("Data encoded to send : %s" %data)
+            #logging.debug("Data encoded to send : %s" %data)
             url = received_url if paid else expired_url
             if not url:
                 continue
             req = urllib2.Request(url, data=data, headers=headers)
             try:
                 response_stream = urllib.request.urlopen(req)
-                #response_stream = urllib2.urlopen(req)
-                ##response_stream = requests.post(url, files=data_json)
                 logging.info('Got Response : %s\nfor reference : %s\nin url : %s' %(response_stream.read().decode('utf-8'), item_number, url))
                 cur.execute("UPDATE electrum_payments SET processed=1 WHERE oid=%d;"%(oid))
             except urllib2.HTTPError as e:

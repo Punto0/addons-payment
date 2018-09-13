@@ -26,7 +26,7 @@ import urllib.request as urllib2
 import json
 import queue as Queue
 import sqlite3
-import urllib
+import urllib.parse
 import logging
 #from decimal import Decimal
 
@@ -250,12 +250,12 @@ def db_thread():
             paid = bool(paid)
             headers = {'content-type':'application/html'}
             data_json = { 'address':address, 'password':cb_password, 'paid':paid, 'item_number': item_number }
-            data_encoded =  urllib.urlencode(data_json)
+            data_encoded =  urllib.parse.urlencode(data_json).encode("utf-8")
             #logging.debug("Data encoded to send : %s" %data_encoded)
             url = received_url if paid else expired_url
             if not url:
                 continue
-            req = urllib2.Request(url, data_encoded, headers)
+            req = urllib2.Request(url, data_json, headers)
             try:
                 response_stream = urllib2.urlopen(req)
                 logging.info('Got Response : %s\nfor reference : %s\nin url : %s' %(response_stream.read(), item_number, url))
